@@ -1,0 +1,95 @@
+list @~;
+list @%customer;
+
+show stages;
+list @STG01;
+
+create stage stg02 comment = 'This is my demo internal stage';
+
+show stages like '%02%';
+
+list @~ pattern  = '.*test.*';
+list @~ pattern='.*.gz';
+list @~ pattern='.*.html';
+
+remove @%customer;
+
+drop stage @customer;
+drop stage stg02;
+
+create or replace file format my_parquet_ff type = 'parquet';
+create or replace file format my_json_ff type = 'json';
+create or replace file format my_csv_ff type = 'csv';
+
+show file formats;
+
+create or replace stage stg_csv file_format = my_csv_ff 
+comment = 'stage will use csv file format';
+
+create stage stg_none comment = 'no file format attached';
+
+show stages;
+use role accountadmin;
+
+create or replace stage azure_employee_csv url = 'azure://sampleblob123456.blob.core.windows.net/sampleblob/Input/employee.csv' CREDENTIALS = (AZURE_SAS_TOKEN = '?sv=2022-11-02&ss=bfqt&srt=co&sp=rwdlacupiytfx&se=2023-07-25T21:47:32Z&st=2023-07-25T13:47:32Z&spr=https&sig=Fimyi4%2F4U6o2mBkjOb0i%2FQky5CFn%2BMMh48XS3JuUsz8%3D') comment = 'this customer csv data';
+
+list @azure_employee_csv;
+
+create file format csv_ff type = 'csv' compression = 'auto' field_delimiter = ',' record_delimiter = '\n' skip_header = 0 field_optionally_enclosed_by = '\042' null_if = ('\\N');
+
+select t.$1,t.$2,t.$3 from @azure_employee_csv (file_format =>'csv_ff') t;
+
+
+create or replace table t1_no_cluster (
+    o_orderkey number(38,0),
+    o_custkey number(38,0),
+    o_orderstatus varchar(1),
+    o_totalprice number(12,2),
+    o_orderdate date,
+    o_orderpriority varchar(15),
+    o_clerk varchar(15),
+    o_shippriority number(38,0),
+    o_comment varchar(79)
+);
+
+select * from t1_no_cluster;
+
+
+create or replace table t2_order_dt (
+o_orderkey number(38,0),
+o_custkey number(38,0),
+o_orderstatus varchar(1),
+o_totalprice number(12,2),
+o_orderdate date,
+o_orderpriority varchar(15),
+o_clerk varchar(15),
+o_shippriority number(38,0),
+o_comment varchar(79)
+)
+cluster by (o_orderdate);
+
+select * from t2_order_dt;
+
+
+create or replace table t3_order_priority (
+o_orderkey number(38,0),
+o_custkey number(38,0),
+o_orderstatus varchar(1),
+o_totalprice number(12,2),
+o_orderdate date,
+o_orderpriority varchar(15),
+o_clerk varchar(15),
+o_shippriority number(38,0),
+o_comment varchar(79)
+)
+
+cluster by (o_orderpriority);
+
+
+select * from t3_order_priority;
+
+
+show tables;
+
+
+select system$clustering_depth('t2_order_dt');
