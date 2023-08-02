@@ -1,0 +1,119 @@
+use database MYDB;
+
+create or replace table MYDB.public.loan_payment (
+	"Loan_ID" string,
+	"Loan_status" string,
+	"principal" string,
+	"terms" string,
+	"effective_date" string,
+	"due_date" string,
+	"paid_off_time" string,
+	"past_due_days" string,
+	"age" string,
+	"education" string,
+	"Gender" string
+);
+
+select * from loan_payment;
+
+//Loading the data from S3 bucket
+COPY INTO PUBLIC.LOAN_PAYMENT
+    FROM s3://bucketsnowflakes3/Loan_payments_data.csv
+    file_format = (type = csv , field_delimiter = ',' , skip_header=1);
+
+select count(*) from loan_payment;
+
+create or replace schema mydb.external_stages;
+
+create or replace stage mydb.external_stages.aws_ext_stage url='s3://bucketsnowflakes3';
+
+list @mydb.external_stages.aws_ext_stage;
+
+select $1,$2,$3,$4,$5,$6 from @mydb.external_stages.aws_ext_stage/OrderDetails.csv;
+
+select $1 as OID,$2 as AMT,$3 as PFT,$4 as QNT,$5 as CAT,$6 as SUBCAT from @mydb.external_stages.aws_ext_stage/OrderDetails.csv;
+
+// Transforming Data while loading
+
+// Case 2: load only required fields
+create or replace table mydb.public.orders_ex (
+	order_id varchar(30),
+	amount int
+);
+
+copy into mydb.public.orders_ex
+	from (select s.$1, s.$2 from @mydb.external_stages.aws_ext_stage s) file_format = (type = csv field_delimiter = ',' skip_header=1) files = ('OrderDetails.csv');
+
+select * from mydb.public.orders_ex;
+
+//case-3:  applying basic transformation by using function
+create or replace table mydb.public.orders_ex (
+	order_id varchar(30),
+	profit int,
+	amount int,
+	cat_substr varchar(5),
+	cat_concat varchar(60),
+	pft_or_loss varchar(10)
+);
+
+//copy command using a sql function
+copy into mydb.public.orders_ex from (select
+	s.$1,s.$3,s.$2,substring(s.$5,1,5),concat($5,$6),
+	CASE WHEN s.$3 <= 0 then 'loss' else 'profit' end from @mydb.external_stages.aws_ext_stage s) file_format = (type=csv field_delimiter=',' skip_header=1) files=('OrderDetails.csv');
+
+select * from mydb.public.orders_ex;
+
+list @mydb.external_stages.aws_ext_stage;
+list @aws_ext_stage;
+
+
+
+//case 4: Loading sequence numbers in columns
+//create a sequence
+
+create sequence seq1;
+
+create or replace table mydb.public.loan_payment (
+	"seq_Id" number default seq1.nextval,
+	"Loan_Id" string,
+	"Loan_status" string,
+	"Principal" string,
+	"terms" string,
+	"effective_date" string,
+	"due_date" string,
+	"paid_off_time" string,
+	"past_due_days" string,
+	"age" string,
+	"education" string,
+	"Gender" string
+);
+
+
+
+//loading the data from s3 bucket
+copy into public.loan_payment("Loan_Id", "Loan_status", "Principal", "terms", "effective_date", "due_date", "paid_off_time", "past_due_days", "age", "education","Gender") from s3://bucketsnowflakes3/Loan_payments_data.csv file_format = (type = csv field_delimiter = ',' skip_header=1);
+
+//validate the data
+select * from  public.loan_payment;
+
+//case 5: using auto increment
+
+create or replace table mydb.public.loan_payment2 (
+	"loan_seq_Id" number autoincrement start 1001 increment 1,
+	"Loan_Id" string,
+	"Loan_status" string,
+	"Principal" string,
+	"terms" string,
+	"effective_date" string,
+	"due_date" string,
+	"paid_off_time" string,
+	"past_due_days" string,
+	"age" string,
+	"education" string,
+	"Gender" string
+);
+
+//loading the data from s3 bucket
+copy into public.loan_payment2("Loan_Id", "Loan_status", "Principal", "terms", "effective_date", "due_date", "paid_off_time", "past_due_days", "age", "education","Gender") from s3://bucketsnowflakes3/Loan_payments_data.csv file_format = (type = csv field_delimiter = ',' skip_header=1);
+
+select * from public.loan_payment2;
