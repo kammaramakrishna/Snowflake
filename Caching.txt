@@ -1,0 +1,68 @@
+//Query is fetching results from storage layer(Remote Disk)
+select * from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;  --2m 32s
+
+//Fetching metadata info is very fast, look at query profile
+select count(*) from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;    --84ms
+select min(c_custkey) from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;    --119ms
+select max(c_custkey) from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;    --72ms
+
+//Run the same query again and observe time taken and query profile
+select * from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;    --97ms
+
+//Try to fetch same data by changing queries little bit and observe query profile
+select c_custkey,c_name,c_acctbal,c_address from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;    --51s
+select c_custkey,c_address from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;    --35s
+select c_address,c_custkey from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;    --35s
+
+//Try to fetch subset of data, with a filer
+select c_custkey,c_name,c_acctbal,c_address from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer where c_nationkey in (1,2);    --7.3s
+
+
+-- Local Disk Cache
+//Turn off Results cache, suspends the VM, run same queries and see query profile
+alter session set use_cached_result = FALSE;
+
+//Query is fetching results from storage layer(Remote Disk)
+select * from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;  --2m 26s
+
+//Fetching metadata info is very fast, look at query profile
+select count(*) from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;    --33ms
+select min(c_custkey) from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;    --33ms
+select max(c_custkey) from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;    --42ms
+
+//Run the same query again and observe time taken and query profile
+select * from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;    --
+
+//Try to fetch same data by changing queries little bit and observe query profile
+select c_custkey,c_name,c_acctbal,c_address from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;    --51s
+select c_custkey,c_address from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;    --35s
+select c_address,c_custkey from SNOWFLAKE_SAMPLE_DATA.tpch_sf1000.customer;    --35s
+
+// Try to fetch subset of data, with a filter
+SELECT C_CUSTKEY, C_NAME, C_ACCTBAL, C_ADDRESS FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1000.CUSTOMER
+    WHERE C_CUSTKEY < 200000; -- 489 ms
+    
+SELECT C_CUSTKEY, C_NAME, C_ACCTBAL, C_ADDRESS FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1000.CUSTOMER
+    WHERE C_NATIONKEY in (1,2,3,4,5); -- 13sec
+
+
+
+// Increase VW size to L or XL, run same queries and see query profile
+
+// First time, it will fetch the data from Remote Disk
+SELECT * FROM  SNOWFLAKE_SAMPLE_DATA.TPCH_SF1000.CUSTOMER; -- 22 sec for L
+
+// Run the same query again and observe time taken and query profile
+SELECT * FROM  SNOWFLAKE_SAMPLE_DATA.TPCH_SF1000.CUSTOMER; -- 15 sec
+
+// Try to fetch same data by changing queries little bit and observe query profile
+SELECT C_CUSTKEY, C_NAME, C_ACCTBAL, C_ADDRESS FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1000.CUSTOMER; -- 4.7sec
+SELECT C_CUSTKEY, C_ADDRESS FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1000.CUSTOMER; -- 3.4 sec
+SELECT C_ADDRESS, C_CUSTKEY FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1000.CUSTOMER; -- 3.4 sec
+
+// Try to fetch subset of data, with a filter
+SELECT C_CUSTKEY, C_NAME, C_ACCTBAL, C_ADDRESS FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1000.CUSTOMER
+    WHERE C_CUSTKEY < 200000; -- 309ms
+    
+SELECT C_CUSTKEY, C_NAME, C_ACCTBAL, C_ADDRESS FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1000.CUSTOMER
+    WHERE C_NATIONKEY in (1,2,3,4,5); -- 1.7 sec
