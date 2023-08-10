@@ -1,0 +1,18 @@
+//create stage object using integration object and file format
+create or replace stage mydb.external_stages.aws_s3_csv url = 's3://ramakrishnakamma/Output/employee.csv' storage_integration = s3_int file_format = mydb.file_formats.csv_fileformat;
+
+list @mydb.external_stages.aws_s3_csv;
+
+// Create a table first
+CREATE OR REPLACE TABLE mydb.public.employee_data (
+empid NUMBER,
+empname STRING,
+deptid NUMBER
+); 
+
+// Use Copy command to load the files
+COPY INTO mydb.public.employee_data
+    FROM @mydb.external_stages.aws_s3_csv
+    PATTERN = '.*employee.*' file_format=(skip_header=1); 
+
+select * from mydb.public.employee_data;    
