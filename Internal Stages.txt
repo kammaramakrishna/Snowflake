@@ -1,0 +1,14 @@
+//video 12
+list @~;
+
+select current_region();
+select current_account();
+
+select system$allowlist();
+
+//user stage
+list @~;
+put file://C:\Users\kamma\Downloads\employee.csv @~/staged/csv;
+
+show stages in internal_stages; 
+select * from MYDB.PUBLIC.CUSTOMER_DATA_TABLE;
