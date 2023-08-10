@@ -1,0 +1,85 @@
+create schema if not exists mydb.file_formats;
+create schema if not exists  mydb.external_stages;
+
+CREATE OR REPLACE STORAGE INTEGRATION azure_int
+  TYPE = EXTERNAL_STAGE
+  STORAGE_PROVIDER = AZURE
+  ENABLED = TRUE
+  STORAGE_ALLOWED_LOCATIONS = ('azure://sampleblob123456.blob.core.windows.net/sampleblob/Input/')
+  AZURE_TENANT_ID = '3b0993d8-31db-4db6-b617-64ac193c7ace'
+  COMMENT = 'integration with azure';
+
+create or replace file format mydb.file_formats.csv_fileformat type=csv field_delimiter=',' skip_header=1 empty_field_as_null=TRUE;
+
+//creating stage object
+create or replace stage mydb.extn_stages.stage_pipe_azure storage_integration = azure_int url = 'azure://sampleblob123456.blob.core.windows.net/sampleblob/Input/';
+
+list @mydb.extn_stages.stage_pipe_azure;
+
+
+// Create a table to load these files
+CREATE OR REPLACE TABLE mydb.public.emp_data 
+(
+  empid int,
+  empname string,
+  department STRING
+);
+
+// Create a schema to keep pipe objects
+CREATE OR REPLACE SCHEMA mydb.pipes;
+
+// Create a pipe
+CREATE OR REPLACE pipe mydb.pipes.employee_pipe
+AUTO_INGEST = FALSE
+AS
+COPY INTO mydb.public.emp_data
+FROM @mydb.extn_stages.stage_pipe_azure
+pattern = '.*employee.*';
+
+show pipes;
+desc pipe mydb.pipes.employee_pipe;
+
+select * from mydb.public.emp_data;
+
+// Step1: Validate pipe is actually working or not
+SELECT SYSTEM$PIPE_STATUS('mydb.pipes.employee_pipe');
+
+// Step2: Check the Copy History
+SELECT * FROM TABLE( INFORMATION_SCHEMA.COPY_HISTORY
+ (TABLE_NAME  =>  'mydb.public.emp_data',
+  START_TIME => DATEADD(HOUR, -10 ,CURRENT_TIMESTAMP()))
+);
+
+//step - 3: Validate the pipe load
+select * from table(Information_Schema.Validate_Pipe_Load(Pipe_name => 'mydb.pipes.employee_pipe',start_time => dateadd(Hour,-2,current_timestamp()))
+);
+
+//correct the delimiter to ','
+create or replace file format mydb.file_formats.csv_fileformat type=csv field_delimiter=',' skip_header=1 empty_field_as_null=True;
+
+
+//Load the history files by running copy command
+copy into mydb.public.emp_data from @mydb.extn_stages.stage_pipe_azure files=('employee.csv');
+
+
+desc pipe mydb.pipes.employee_pipe;
+
+show pipes;
+show pipes like '%employee%';
+show pipes in database mydb;
+show pipes in schema mydb.pipes;
+show pipes like '%employee%' in database mydb;
+
+// How to pause a pipe
+ALTER PIPE mydb.pipes.employee_pipe SET PIPE_EXECUTION_PAUSED = true;
+
+// Want to modify the copy command
+CREATE OR REPLACE pipe mydb.pipes.employee_pipe
+auto_ingest = TRUE
+AS
+COPY INTO mydb.public.emp_data
+FROM @mydb.extn_stages.stage_pipe_azure
+pattern = '.*employee.*'; 
+
+// How to resume the pipe
+ALTER PIPE mydb.pipes.employee_pipe SET PIPE_EXECUTION_PAUSED = false;
