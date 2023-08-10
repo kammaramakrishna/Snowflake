@@ -1,0 +1,123 @@
+CREATE SCHEMA IF NOT EXISTS  MYDB.EXT_STAGES;
+
+create or replace table mydb.public.tbl_orders (
+	order_id varchar(30),
+	amount varchar(30),
+	profit int,
+	quantity int,
+	category varchar(30),
+	subcategory varchar(30)
+);
+
+//case 1: Files without errors
+//create stage object
+create or replace stage mydb.ext_stages.sample_aws_stage
+url = 's3://snowflakebucket-copyoption/size/';
+
+list @mydb.ext_stages.sample_aws_stage;
+
+
+//Load data using copy command
+copy into mydb.public.tbl_orders from @sample_aws_stage file_format = (type = csv field_delimiter = ',' skip_header=1) pattern = '.*Order.*' validation_mode = return_errors;
+
+
+copy into mydb.public.tbl_orders from @sample_aws_stage file_format = (type = csv field_delimiter = ',' skip_header=1) pattern = '.*Order.*' validation_mode = return_10_rows;
+
+
+//case 2: Files wit errors
+//create stage object
+create or replace stage mydb.ext_stages.sample_aws_stage2
+url = 's3://snowflakebucket-copyoption/returnfailed/';
+
+list @mydb.ext_stages.sample_aws_stage2;
+
+
+//Load data using copy command
+copy into mydb.public.tbl_orders from @sample_aws_stage2 file_format = (type = csv field_delimiter = ',' skip_header=1) pattern = '.*Order.*' validation_mode = return_errors;
+
+
+copy into mydb.public.tbl_orders from @sample_aws_stage2 file_format = (type = csv field_delimiter = ',' skip_header=1) pattern = '.*Order.*' validation_mode = return_10_rows;
+
+
+//case 3: on_error
+create or replace table mydb.public.tbl_orders (
+	order_id varchar(30),
+	amount varchar(30),
+	profit int,
+	quantity int,
+	category varchar(30),
+	subcategory varchar(30)
+);
+
+
+//create stage object
+create or replace stage mydb.ext_stages.sample_aws_stage
+url = 's3://snowflakebucket-copyoption/returnfailed/';
+
+
+//Load data using copy command
+copy into mydb.public.tbl_orders from @sample_aws_stage file_format = (type = csv field_delimiter = ',' skip_header=1) pattern = '.*Order.*';
+
+
+//Load data using copy command
+copy into mydb.public.tbl_orders from @sample_aws_stage file_format = (type = csv field_delimiter = ',' skip_header=1) pattern = '.*Order.*' on_error=continue;
+
+
+//case 4: force
+//try to load same command will leads to error
+create or replace table mydb.public.tbl_orders (
+	order_id varchar(30),
+	amount varchar(30),
+	profit int,
+	quantity int,
+	category varchar(30),
+	subcategory varchar(30)
+);
+
+
+//create stage object
+create or replace stage mydb.ext_stages.sample_aws_stage
+url = 's3://snowflakebucket-copyoption/size/';
+
+
+//Load data using copy command
+copy into mydb.public.tbl_orders from @sample_aws_stage file_format = (type = csv field_delimiter = ',' skip_header=1) pattern = '.*Order.*';
+
+
+//Load data using copy command
+copy into mydb.public.tbl_orders from @sample_aws_stage file_format = (type = csv field_delimiter = ',' skip_header=1) pattern = '.*Order.*';
+
+//force
+copy into mydb.public.tbl_orders from @sample_aws_stage file_format = (type = csv field_delimiter = ',' skip_header=1) pattern = '.*Order.*' force=true;
+
+select count(*) from mydb.public.tbl_orders;
+
+//case 6: truncate columns
+create or replace table mydb.public.tbl_orders (
+	order_id varchar(30),
+	amount varchar(30),
+	profit int,
+	quantity int,
+	category varchar(30),
+	subcategory varchar(30)
+);
+
+
+//create stage object
+create or replace stage mydb.ext_stages.sample_aws_stage
+url = 's3://snowflakebucket-copyoption/size/';
+
+
+//Load data using copy command
+copy into mydb.public.tbl_orders from @sample_aws_stage file_format = (type = csv field_delimiter = ',' skip_header=1) pattern = '.*Order.*';
+
+
+//Load data using copy command
+//truncate only required charcahters in the table
+copy into mydb.public.tbl_orders from @sample_aws_stage file_format = (type = csv field_delimiter = ',' skip_header=1) pattern = '.*Order.*' truncatecolumns=true;
+
+select * from mydb.public.tbl_orders;
+
+
+//case 7: size_limit in bytes
+copy into mydb.public.tbl_orders from @sample_aws_stage file_format = (type = csv field_delimiter = ',' skip_header=1) pattern = '.*Order.*' size_limit=10000;
