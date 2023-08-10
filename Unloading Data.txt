@@ -1,0 +1,49 @@
+// Create storage integration object
+create or replace storage integration s3_int
+  TYPE = EXTERNAL_STAGE
+  STORAGE_PROVIDER = S3
+  ENABLED = TRUE 
+  STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::846999304099:role/aws_s3_snowflake_int'
+  STORAGE_ALLOWED_LOCATIONS = ('s3://ramakrishnakamma/Output/')
+  COMMENT = 'Integration with aws s3 buckets' ;
+
+  desc integration s3_int;
+
+create database if not exists mydb;
+create schema if not exists mydb.file_formats;
+
+//create file format object
+create or replace file format mydb.file_formats.csv_fileformat type = csv field_delimiter = '|' skip_header = 1 empty_field_as_null = TRUE;
+
+//create stage object using integration object and file format
+create or replace stage MYDB.EXT_STAGES.MYS3_OUTPUT url = 's3://ramakrishnakamma/Output/' storage_integration = s3_int file_format = mydb.file_formats.csv_fileformat;
+
+//Generate files and store them in the stage location
+copy into @mydb.ext_stages.mys3_output from snowflake_Sample_data.tpch_sf1.customer;
+
+list @mydb.ext_stages.mys3_output;
+
+// Specifiy the filename in the copy command
+COPY INTO @MYDB.EXT_STAGES.MYS3_OUTPUT/customer
+FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER;
+
+
+// Use OVERWRTIE=TRUE
+// If we want to overwrite existing file we can set that to TRUE
+COPY INTO @MYDB.EXT_STAGES.MYS3_OUTPUT/customer
+FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER
+MAX_FILE_SIZE=2000000
+OVERWRITE = TRUE;
+
+//Listing files under my s3 bucket
+LIST @MYDB.EXT_STAGES.MYS3_OUTPUT;
+
+//generate single file
+COPY INTO @MYDB.EXT_STAGES.MYS3_OUTPUT/CUST
+FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER
+SINGLE = TRUE;
+
+//detailed output
+COPY INTO @MYDB.EXT_STAGES.MYS3_OUTPUT/cust_data
+FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER
+DETAILED_OUTPUT = TRUE;
