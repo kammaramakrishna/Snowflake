@@ -1,0 +1,107 @@
+show tables in schema mydb.public;
+show schemas in database mydb;
+show databases;
+
+//how to set this at the time of table creation
+create or replace table mydb.public.timetravel_ex(id number, name string);
+
+show tables like 'timetravel_ex%';
+
+create or replace table mydb.public.timetravel_ex(id number,name string) data_retention_time_in_days = 10;
+
+show tables like 'timetravel_ex%';
+
+//setting at schema level
+create schema mydb.abcxyz data_retention_time_in_days=10;
+
+show schemas like 'abcxyz';
+
+create or replace table mydb.abcxyz.timetravel_ex2(id number,name string);
+show tables like 'timetravel_ex2%';
+
+create or replace table mydb.abcxyz.timetravel_ex2(id number,name string) data_retention_time_in_days = 20;
+
+show tables like 'timetravel_ex2%';
+
+//how to alter retention period later?
+alter table mydb.public.timetravel_ex set data_retention_time_in_days=15;
+
+show tables like 'timetravel_ex%';
+
+//querying history data
+//updating some data first
+
+//case1:update some data in customer table
+select * from SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER;
+
+select * from SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER where C_CUSTKEY = 128;
+
+update SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER set c_name='abcxyz' where c_custkey = 128;
+
+select * from SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER where c_custkey = 128;
+
+
+show tables;
+
+select * from employee_data;
+
+UPDATE mydb.public.employee_data SET empname='Viraj' WHERE empid=3;
+
+
+//case 2: delete some data from employee_data table
+select * from mydb.public.employee_data;
+
+select * from mydb.public.employee_data where empid = 3;
+
+delete from mydb.public.employee_data where empid = 3;
+
+select current_timestamp;
+
+select * from mydb.public.employee_data where empid = 3;
+
+
+//case 3: update some more things
+UPDATE mydb.public.employee_data SET empname='Rama' WHERE empid=1;
+
+select * from mydb.public.employee_data;
+
+// Case1: retrieve history data by using AT OFFSET
+
+SELECT * FROM mydb.public.employee_data WHERE empid=3;
+
+SELECT * FROM mydb.public.employee_data AT (offset => -60*10)
+WHERE empid=3;
+
+// Case2: retrieve history data by using AT TIMESTAMP
+SELECT * FROM myown_db.public.employee_data where id=3;
+
+SELECT * FROM mydb.public.employee_data AT(timestamp => '2023-08-09 18:49:50.792 -0700'::timestamp)
+WHERE empid=3;
+
+CREATE or replace TABLE mydb.public.Persons (
+    PersonID int,
+    LastName varchar(255),
+    FirstName varchar(255),
+    Address varchar(255),
+    City varchar(255)
+);
+
+select * from mydb.public.Persons;
+
+show tables;
+drop table mydb.public.Persons;
+undrop table mydb.public.Persons;
+
+
+// Restoring Schemas
+SHOW SCHEMAS in DATABASE mydb;
+DROP SCHEMA STAGE_TBLS;
+SHOW SCHEMAS in DATABASE mydb;
+UNDROP SCHEMA STAGE_TBLS;
+SHOW SCHEMAS in DATABASE mydb;
+
+// Time Travel Cost
+SELECT * FROM SNOWFLAKE.ACCOUNT_USAGE.TABLE_STORAGE_METRICS;
+
+SELECT * FROM SNOWFLAKE.ACCOUNT_USAGE.TABLE_STORAGE_METRICS
+WHERE TABLE_NAME = 'CUSTOMER_LARGE';
