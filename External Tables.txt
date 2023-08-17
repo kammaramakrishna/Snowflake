@@ -1,0 +1,81 @@
+use database mydb;
+
+//create a schema for stage objects
+create schema if not exists ext_stages;
+
+//create a schema for file format objects
+create schema if not exists file_formats;
+
+//create a schema for external tables
+create schema if not exists ext_tables;
+
+//create a file format object
+create or replace file format mydb.file_formats.csv_fileformat type = csv field_delimiter = ',' skip_header = 1 empty_field_As_null = TRUE;
+
+//create stage object with integration object & file format object
+//using the storage Integration object that was already created
+
+desc integration s3_int;
+
+// Create storage integration object
+create or replace storage integration s3_int
+  TYPE = EXTERNAL_STAGE
+  STORAGE_PROVIDER = S3
+  ENABLED = TRUE 
+  STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::846999304099:role/aws_s3_snowflake_int'
+  STORAGE_ALLOWED_LOCATIONS = ('s3://ramakrishnakamma/csv/')
+  COMMENT = 'Integration with aws s3 buckets' ;
+
+create or replace stage mydb.ext_stages.mys3_stage url = 's3://ramakrishnakamma/csv/' storage_integration = s3_int file_format = mydb.file_formats.csv_fileformat;
+
+//listing files under my s3 bucket
+list @mydb.ext_stages.mys3_stage;
+
+
+//create external tables
+create or replace external table ext_tables.et_s3_customer(
+empid number as (value:c1::number),
+empname varchar as (value:c2::varchar),
+deptid number as (value:c3::number)
+)
+with
+location = @mydb.ext_stages.mys3_stage pattern = '.*employee.*' file_format = mydb.file_formats.csv_fileformat;
+
+select * from ext_tables.et_s3_customer;
+
+
+//file data along with field names
+select metadata$filename,T.* from ext_tables.et_s3_customer t;
+
+//To see external tables
+desc external table ext_tables.et_s3_customer type = 'column';
+desc external table ext_tables.et_s3_customer type = 'stage';
+
+
+//To see the files it is referring
+select distinct metadata$filename from ext_tables.et_s3_customer;
+
+
+//Analyze the data (query is for other data)
+//Requirement: Get the list of customer who placed more than 10 orders
+select  c.cust_id, sum(o.num_orders) from ext_tables.et_s3_customer c inner join ext_tables.et_s3_orders o on c.cust_id = o.cust_id group by c.cust_id having sum(o.num_orders) > 10;
+
+
+//Views on external tables
+
+//create a schema for views
+create schema if not exists myviews;
+
+//create a secure view
+create or replace secure view myviews.secvw_et_cust as
+select empid,empname from ext_tables.et_s3_customer;
+
+//Query the secure view
+select * from myviews.secvw_et_cust;
+
+//create materialized view
+create or replace secure view myviews.matvw_et_cust
+as
+select * from ext_tables.et_s3_customer where deptid = 10;
+
+select * from myviews.matvw_et_cust;
