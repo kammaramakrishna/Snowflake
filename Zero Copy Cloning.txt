@@ -1,0 +1,25 @@
+show tables like '%persons%';
+
+//cloning a table
+create table mydb.public.persons_clone clone mydb.public.persons;
+
+select * from mydb.public.persons;
+select * from mydb.public.persons_clone;
+
+//cloning schema
+create schema mydb.copy_of_file_formats clone mydb.file_formats;
+
+//cloning database
+create database mydb_copy clone mydb;
+
+//dropping cloned objects
+drop database mydb_copy;
+drop schema mydb.copy_of_file_formats;
+drop table mydb.public.persons_clone;
+
+create or replace table mydb.public.persons_tt_clone clone mydb.public.persons at (offset => -60*5);
+
+select * from mydb.public.persons_tt_clone;
+
+
+
