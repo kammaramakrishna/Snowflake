@@ -1,0 +1,75 @@
+show tables in schema public;
+
+create or replace transient table mydb.public.tran_table(id number);
+create or replace temporary table mydb.public.temp_table(name string);
+
+show tables in schema public;
+
+--Transient Tables/Schemas
+//create transient schema
+create or replace transient schema mydb.tran_schema;
+
+show schemas in database mydb;
+
+//create trans table under this trans schema without trans keyword
+create or replace table mydb.tran_schema.tran_table(name string);
+
+show tables in schema mydb.tran_schema;
+
+//Can you alter retention period for transient atbles
+alter table mydb.tran_schema.tran_table
+set  DATA_RETENTION_TIME_IN_DAYS = 1;
+
+
+//we can restore trans tables within 24 hours
+drop table mydb.tran_schema.tran_table;
+
+show tables in schema mydb.tran_schema;
+
+undrop table mydb.tran_schema.tran_table;
+
+show tables in schema mydb.tran_schema;
+
+//Temporary Tables
+
+//can we create temporary schema or database - no
+create or replace temporary schema mydb.temp_schema;
+
+//create temp tables and insert sample data
+create or replace temporary table mydb.public.temp_table2(name string);
+
+insert into mydb.public.temp_table2 values('Ravi');
+insert into mydb.public.temp_table2 values('Raju');
+insert into mydb.public.temp_table2 values('Gopi');
+
+
+//Run this in 2 diff worksheets and observe results
+select * from mydb.public.temp_table2;
+
+//recreate the table and check the data
+create or replace temporary table mydb.public.temp_table2(name string);
+
+select * from mydb.public.temp_table2;
+
+//try to restore - but can't restore with same name
+undrop table mydb.public.temp_table2;
+
+//rename current table and undrop table - will get dropped table
+alter table mydb.public.temp_table2 rename to mydb.public.temp_table3;
+
+undrop table mydb.public.temp_table2;
+
+select * from mydb.public.temp_table2;
+
+//create a temp table with same name as perm table
+create temporary table mydb.public.emp_data(id number);
+insert into mydb.public.emp_data values(20);
+insert into mydb.public.emp_data values(47);
+insert into mydb.public.emp_data values(35);
+
+
+//Execute this in two diff worksheets and observer results
+select * from mydb.public.emp_data;
+
+show tables in schema public;
+
