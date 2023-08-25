@@ -1,0 +1,84 @@
+--User Defined Functions
+//Create Database and Schema if not exists
+create database if not exists mydb;
+create schema if not exists myfunctions;
+
+//if snowflake_sample_data database is not available, first get it
+
+--Scalar UDFs
+//Create Function to calculate Tax
+//Scenario 1: Fixed Tax of 10%
+create or replace function myfunctions.cust_tax(price float)
+returns float
+as
+$$
+  (price*10)/100
+$$
+;
+
+
+grant usage on function myfunctions.cust_tax(float) to public;
+
+select o_orderkey,o_orderdate,o_totalprice,cust_tax(o_totalprice)
+from snowflake_sample_data.tpch_sf1.orders;
+
+
+
+//Scenario 2 - Variable Tax
+create or replace function myfunctions.cust_tax(price float,tax_per float)
+returns float
+as
+$$
+  (price*Tax_per)/100
+$$
+;
+
+//Grant the access on function to all users/roles
+grant usage on function myfunctions.cust_tax(float,float) to public;
+
+
+//Get the tax on all orders
+select o_orderkey,o_orderdate,o_totalprice,cust_tax(o_totalprice,7.5)
+from snowflake_sample_data.tpch_sf1.orders;
+
+
+
+--Tabular UDFs
+//create some sample tables
+create or replace table public.countries
+(country_code char(2),country_name varchar);
+
+insert into public.countries(country_code,country_name) values
+('FR','FRANCE'),
+('US','UNITED STATES'),
+('IN','INDIA'),
+('SP','SPAIN');
+
+create or replace table public.user_addresses
+(user_id integer,country_code char(2));
+
+insert into public.user_addresses (user_id,country_code) values
+(100,'SP'),
+(123,'FR'),
+(567,'US'),
+(420,'IN');
+
+
+//create a function to fetch country name of customer
+create or replace function myfunctions.get_countries_for_user(id number)
+returns table(user_id number,country_name varchar)
+as
+$$
+select id,c.country_name from public.user_addresses a,public.countries c 
+     where a.user_id = id
+     and c.country_code = a.country_code
+$$
+;
+
+
+//Fetch country name for specified user id
+select * from table(myfunctions.get_countries_for_user(420));
+
+
+//Fetch country name for all users
+select F.* from public.user_addresses,table(myfunctions.get_countries_for_user(user_id))F;
