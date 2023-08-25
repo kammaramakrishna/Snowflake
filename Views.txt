@@ -1,0 +1,94 @@
+//views
+use database mydb;
+
+//create a schema for view
+create schema myviews;
+
+//Requirement: Need Contact details for Brazil Customers
+
+//create customer view
+create or replace view myviews.vw_customer
+as
+select cst.c_custkey,cst.c_name,cst.c_address,cst.c_phone from snowflake_sample_data.tpch_sf100.customer cst inner join snowflake_sample_data.tpch_sf100.nation ntn
+on cst.c_nationkey = ntn.n_nationkey where ntn.n_name = 'BRAZIL';
+
+//Query the view and see query profile how it is fetching data from underlying tables
+select * from myviews.vw_customer;
+
+//Turnoff cached results and suspend warehouse
+alter session set use_cached_result = false;
+
+select * from myviews.vw_customer;
+
+//Grant access to role public
+grant usage on database mydb to role public;
+grant usage on schema mydb.myviews to role public;
+grant select on view mydb.myviews.vw_customer to role public; --role or user who needs brazil customer data
+
+
+
+//Secure Views
+//Requirement: Need all details of America customers
+
+//create secure view
+create or replace secure view myviews.sec_vw_customer
+as
+select cst.* from snowflake_sample_data.tpch_sf100.customer cst
+inner join snowflake_sample_data.tpch_sf100.nation ntn
+on cst.c_nationkey = ntn.n_nationkey
+inner join snowflake_sample_data.tpch_sf100.region rgn
+on ntn.n_regionkey = rgn.r_regionkey
+where rgn.r_name = 'AMERICA';
+
+//Query secure view
+select * from myviews.sec_vw_customer;
+
+//Grant access to role public
+grant usage on database mydb to role public;
+grant usage on schema mydb.myviews to role public;
+grant select on view mydb.myviews.sec_vw_customer to role public; --role or user who needs America customer data
+
+
+//How to identify a view is secure?
+select table_catalog,table_schema,table_name,is_secure from mydb.information_schema.views;
+
+show VIEWS in schema myviews;
+
+//switch to public role and check
+show views; --only owner can see the definition of view
+
+
+--Materialized views
+
+//Try creating a materilized view with multiple table - it won't work
+create materialized view myviews.mat_vw_customer
+as
+select cst.* from snowflake_sample_data.tpch_sf100.customer cst
+inner join snowflake_sample_data.tpch_sf100.nation ntn
+on cst.c_nationkey = ntn.n_nationkey
+inner join snowflake_sample_data.tpch_sf100.region rgn
+on ntn.n_regionkey = rgn.r_regionkey where rgn.r_name = 'AMERICA';
+
+
+//Requirement: I want to check frequently the High Priority order details
+
+//Create materialized view
+create materialized view myviews.mat_vw_orders
+as
+select * from snowflake_sample_data.tpch_sf100.orders
+where substring(o_orderpriority,1,1)='2';
+--and year(o_orderdate)=2022 and month(o_orderdate)=7;
+
+//Query mat view and see query profile,run after some time
+select * from myviews.mat_vw_orders;
+
+//Grant access to public role
+grant usage on database mydb to role public;
+grant usage on schema mydb.myviews to role public;
+grant select on view mydb.myviews.mat_vw_orders to role public;
+
+//How to see the mat views?
+show materialized views;
+
+//how ti check the refresh history?
+select * from table(Information_schema.materialized_view_refresh_history());
