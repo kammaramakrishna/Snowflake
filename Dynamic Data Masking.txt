@@ -1,0 +1,80 @@
+use database mydb;
+
+//create a schema for policies
+create schema mypolicies;
+
+//Try to clone from sample data --we can't clone tables from shared databases
+create table public.customer
+clone snowflake_sample_data.tpch_sf1.customer;
+
+//create a sample table
+create table public.customer
+as select * from snowflake_sample_data.tpch_sf1.customer;
+
+select * from public.customer;
+
+//Grant access to other roles
+grant usage on database mydb to role sales_users;
+grant usage on schema mydb.public to role sales_users;
+grant select on table mydb.public.customer to role sales_users;
+
+grant usage on database mydb to role sales_admin;
+grant usage on schema mydb.public to role sales_admin;
+grant select on table mydb.public.customer to role sales_admin;
+
+grant usage on database mydb to role market_users;
+grant usage on schema mydb.public to role market_users;
+grant select on table mydb.public.customer to role market_users;
+
+grant usage on database mydb to role market_admin;
+grant usage on schema mydb.public to role market_admin;
+grant select on table mydb.public.customer to role market_admin;
+
+
+--want to hide phone and account balance
+create or replace masking policy customer_phone
+ as (val string) returns string->
+case when current_role() in ('SALES_ADMIN','MARKET_ADMIN') then val 
+else '##-###-###-'||substring(val,12,4)
+end;
+
+
+create or replace masking policy customer_accbal
+as (val number) returns number-v
+case when current_role() in ('Sales_admin','market_admin')then va
+else '####'
+end;
+
+
+create or replace masking policy customer_accbal2 as (val number) returns number-v
+case when current_role() in ('SALES_ADMIN','MARKET_ADMIN') then val
+else 0
+end;
+
+
+
+//Applying masking policies on columns of customer table
+alter table public.customer modify column c_phone
+set masking policy customer_phone;
+
+alter table public.customer modify column c_acctbal
+set masking policy customer_accbal;
+
+//switch to sales_users and see the data
+use role sales_users;
+
+select * form public.customer;
+
+
+//Unset policy customer_accbal and set to customer_accbal2
+alter table public.customer modify column c_acctbal
+unset masking policy;
+
+alter table public.customer modify column c_acctbal
+set masking policy customer_Accbal2;
+
+
+//switch to sales_admin and see the data
+use role sales_admin;
+
+select * from public.customer;
