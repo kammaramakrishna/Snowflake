@@ -1,0 +1,27 @@
+create database mydb;
+
+use mydb;
+//creating the roles
+--User 1: Account Admin
+create user Donald password = 'abc123' default_role = ACCOUNTADMIN MUST_change_password = True;
+
+show roles;
+
+show users;
+
+grant role accountadmin to user Donald;
+
+--User 2: security admin
+create user Charles password = 'abc123' default_role = securityadmin must_change_password = true;
+
+grant role securityadmin to user charles;
+
+--User 3: System admin
+create user Janet password = 'abc123' default_role = sysadmin must_change_password = true;
+
+grant role sysadmin to user Janet;
+
+GRANT OPERATE ON WAREHOUSE COMPUTE_WH TO ROLE securityadmin;
+
+ALTER WAREHOUSE IF EXISTS COMPUTE_WH RESUME IF SUSPENDED;
+USE WAREHOUSE COMPUTE_WH;
