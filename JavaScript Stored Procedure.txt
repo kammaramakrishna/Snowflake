@@ -1,0 +1,89 @@
+create or replace table mydb.public.daily_table_counts
+(
+load_time timestamp,
+database_name varchar(30),
+schema_name varchar(30),
+table_name varchar(40),
+table_count int
+);
+
+
+create or replace table mydb.public.proc_error_log
+(
+proc_name varchar(50),
+run_time timestamp,
+errod_cd varchar(20),
+error_msg varchar(1000),
+error_line varchar(100)
+);
+
+
+//create procedure
+create or replace procedure myprocs.proc_load_table_counts(db varchar,sch varchar)
+returns varchar
+language javascript
+//Execute as caller
+as
+$$
+  var err = '';
+var procName = Object.keys(this)[0];
+var procResult = 'SUCCESSFULLY COMPLETED';
+
+ try
+ {
+    var dbase = DB;
+ var table_list = `select table_catalog,table_schema,table_name from `+dbase+`.INFORMATION_SCHEMA.TABLES where table_catalog = ? and table_schema = ?`;
+
+var table_list_stmt = snowflake.createStatement({sqlText:table_list,binds:[DB,SCH]});
+
+var exe_table_list_stmt = table_list_stmt.execute();
+
+while(exe_table_list_stmt.next())
+{
+ var dbname = exe_table_list_stmt.getColumnValue('Table_catalog');
+var schname = exe_table_list_stmt.getColumnValue('table_schema');
+var tblname = exe_table_list_stmt.getColumnValue('table_name');
+
+
+var row_count_qry = `select count(1) as CNT from `+dbname+`.`+schname+`.`+tblname+`;`;
+var row_count_stmt = snowflake.createStatemt({sqlText:row_count_qry});
+var exe_row_count_stmt = row_count_stmt.execute();
+
+exe_row_count_stmt.next();
+var row_count = exe_row_count_stmt.getColumnValue('CNT');
+
+var insrt_qry = `insert into mydb.public.daily_table_counts(load_time,database_name,schema_name,table_name,table_count) values(current_timestamp;`+dbname+`';`+schname+`'`+tblname+`';`+row_count+`);`;
+  var insrt_qry_stmt = snowflake.createStatement({sqlText:insrt_qry});
+  var exe_insrt_qry_stmt = insrt_qry_stmt.execute();
+}
+}
+
+catch(err)
+{
+ var error_query = `insert into mydb.public.proc_error_log(proc_name,run_time,errod_cd,error_msg,error_line) values('`+procName+`',current_timestamp,'`+err.code+`','`+err.message.replace(/\'/g,"")+`','`+err.stackTraceTxt+`');`; 
+var error_query_stmt = snowflake.createStatement({sqlText:error_query});
+var exe_error_query_stmt = error_query_stmt.execute();
+
+
+
+procResult = `FAILED,CHECK PROC_ERROR_LOG TABLE FOR ERROR DETAILS`;
+}
+
+return procResult;
+$$
+;
+
+//Calling Procedure
+call mydb.myprocs.proc_load_table_counts('SNOWFLAKE_SAMPLE_DATA', 'TPCH_SF1');
+call mydb.myprocs.proc_load_table_counts('mydb','public');
+
+//Validating Data
+select * from mydb.public.daily_table_counts;
+select * from mydb.public.proc_error_log;
+
+
+//scheduling the procedure to run daily at 07:30am utc
+create or replace task mytasks.task_table_counts
+warehouse = compute_wh schedule = 'using cron 30 7 * * * UTC'
+as
+call mydb.myprocs.proc_load_table_counts('snowflake_sample_data','tpch_sf1');
