@@ -1,0 +1,85 @@
+1. select * from tablename sample row(10);
+Return a sample with 10% of rows
+
+
+2. select * from tablename tablesample block(20);
+Return a sample with data from 20% blocks
+
+
+3. select * from tablename sample system(10) seed(111);
+Return a sample with data from 10% of blocks and guarantees same data set if we use seed 111 next time.
+
+4. select * from tablename tablesample(100);
+Return an entire table,including all rows into the sample
+
+
+5. select * from tablename sample row(0);
+Return an empty sample
+
+
+6. select * from tablename sample(10 rows);
+Return a fixed-size sample of 10 rows
+
+
+
+
+--Lab Queries
+create database if not exists mydb;
+
+use database mydb;
+use schema public;
+
+//Creating tables with sample data
+
+//Bernouli or Row
+create table cust_sample_1 as
+select * from snowflake_Sample_data.tpch_sf10.customer sample(10);
+
+
+create table cust_sample_2 as
+select * from snowflake_sample_data.tpch_sf10.customer sample row(10);
+
+
+select count(1) from snowflake_sample_data.tpch_sf10.customer;
+select count(1) from mydb.public.cust_sample_1;
+select count(1) from mydb.public.cust_sample_2;
+
+
+
+//System or Block
+create table cust_sample_3 as
+select * from snowflake_sample_data.tpch_sf10.customer sample block(5);
+
+
+create table cust_sample_4 as
+select * from snowflake_sample_data.tpch_sf10.customer sample system(5) seed(111);
+
+
+select count(1) from snowflake_Sample_data.tpch_sf10.customer;
+select count(1) from mydb.public.cust_sample_3;
+select count(1) from mydb.public.cust_sample_4;
+
+
+//Sample with fixed number of rows
+create table cust_sample_5 as
+select * from snowflake_sample_data.tpch_sf10.customer sample row(1000 rows);
+
+select count(1) from cust_Sample_5;
+
+
+//Just selecting sample data
+select * from snowflake_Sample_data.tpch_sf10.customer sample bernoulli(10);
+
+
+select * from snowflake_sample_data.tpch_sf10.customer sample  system(5) seed(111);
+
+
+//Check the seed is same or not
+select * from cust_sample_4
+minus
+select * from snowflake_sample_data.tpch_sf10.customer sample system(5) seed(111); --same
+
+
+select * from cust_sample_3
+minus
+select * from snowflake_Sample_data.tpch_sf10.customer sample system(5) seed(111);  -- not samea
