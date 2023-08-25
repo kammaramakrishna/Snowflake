@@ -1,0 +1,133 @@
+--Data Sharing to other snowflake users
+//create a database
+create database if not exists mydb;
+
+//create schemas
+create schema cust_tbls;
+create schema cust_views;
+
+//create some tables in tbls schema
+create or replace table mydb.cust_tbls.customer
+as select * from snowflake_sample_data.tpch_sf1.customer;
+
+create or replace table mydb.cust_tbls.orders as
+select * from snowflake_sample_data.tpch_sf1.orders;
+
+
+//create a view in views schema
+create or replace view cust_views.vw_cust
+as
+select cst.c_custkey,cst.c_name,cst.c_address,cst.c_phone from snowflake_sample_data.tpch_sf10.customer cst
+inner join snowflake_sample_data.tpch_sf10.nation ntn
+on cst.c_nationkey = ntn.n_nationkey
+where ntn.n_name = 'BRAZIL';
+
+
+//Create a secure view in views schema
+create or replace secure view cust_views.sec_vw_cust
+as
+select cst.c_custkey,c_name,c_address,c_phone
+from mydb.cust_tbls.customer cst;
+
+
+//create a mat view in views schema
+create materialized view mydb.cust_views.mat_vw_orders
+as
+select * from mydb.cust_tbls.customer;
+
+
+//create a secure mat view in views schema
+create secure materialized view cust_views.sec_mat_vw_orders
+as
+select * from mydb.cust_tbls.customer;
+
+
+//Create a share object
+--we can create and manage share objects in two ways
+-- 1. By using sql queries
+-- 2. By using share tabs in UI
+
+create or replace share cust_data_share;
+
+//Grant access to share object
+grant usage on database mydb to share cust_data_share;
+
+
+grant usage on schema mydb.cust_tbls to share cust_data_share;
+grant select on table mydb.cust_tbls.customer to share cust_data_share;
+grant select on table mydb.cust_tbls.orders to share cust_data_share;
+
+
+grant usage on schema mydb.cust_views to share cust_data_share;
+grant select on view mydb.cust_views.vw_cust to share cust_data_share;
+grant select on view mydb.cust_views.sec_vw_cust to share cust_data_share;
+grant select on view mydb.cust_views.mat_vw_orders to share cust_data_share;
+grant select on view mydb.cust_views.sec_mat_vw_orders to share cust_data_share;
+
+select current_version();
+
+
+//How to see share objects
+show shares; --or we can use shares tab
+
+//How to see the grants of a share object
+show grants to share cust_data_share;
+
+
+//Add the consumer account to share the data
+alter share cust_data_share add account = il21353;
+
+
+//How to share complete schema
+grant select on all tables in schema mydb.cust_tbls to share cust_data_share;
+
+//How to share complete databse
+grant select on all tables in database mydb to share cust_data_share;
+
+
+
+--Consumer side database setup
+
+show shares;
+
+desc share cust_data_share;
+
+//create a database to consume the shared data
+create database cust_db_shared from share cust_data_share;
+
+select * from cust_db_shared.cust_tbls.customer;
+
+
+--Data Sharing to Non-snowflake users
+
+//create a reader account
+create managed account customer_analyst
+admin_name = cust_analyst, admin_password = 'Abcd@1234',
+type = READER;
+
+//How to see reader accounts
+show managed accounts;
+
+
+//ADd reader account to share object
+alter share cust_Data_share add account = VO39655;
+
+alter share cust_data_share add account = VO39655
+share_restrictions = false;
+
+
+//Reader Side Database Setup
+show shares;
+
+//create database to consume the shared data
+create database cust_db_shared from share share-name;
+
+//query the shared tables
+select * from cust_db_shared.cust_tbls.customer;
+
+//create a virtual warehouse
+create warehouse READER_WH with warehouse_size = 'X-SMALL'
+auto_suspend = 180 auto_resume = TRUE;
+
+
+select * from CUST_DB_READER.cust_tbls.customer;
