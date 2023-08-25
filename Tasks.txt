@@ -1,0 +1,150 @@
+--Tasks
+use database mydb;
+create schema mytasks;
+
+//create a sample table for inserting data using tasks
+create or replace table mydb.public.track_load_time(id int autoincrement start = 1 increment = 1, name varchar(20) default 'rama', load_time timestamp);
+
+//create task to insert data for every minute
+create or replace task mytasks.task_track_time warehouse = compute_wh schedule = '1 minute'
+as
+insert into mydb.public.track_load_time(load_time) values(current_timestamp);
+
+//view data
+select * from mydb.public.track_load_time;
+
+//To see tasks
+show tasks;
+
+desc task mytasks.task_track_time;
+
+//starting and suspending tasks
+alter task mytasks.task_track_time resume;
+
+--alter task mytasks.task_track_time suspend;
+
+//using cron to load the data for every minute
+create or replace task mytasks.task_track_time2 warehouse = compute_wh schedule = 'using cron * * * * * UTC'
+as
+insert into mydb.public.track_load_time(name,load_time) values('Donalad' , current_timestamp);
+
+alter task mytasks.task_track_time2 resume;
+
+//view the data
+select * from mydb.public.track_load_time;
+
+//some example schedules
+
+//every day ata 7am utc timezone
+SCHEDULE = 'using cron 0 7 * * * UTC'
+
+//every day at 10am and 10pm
+schedule = 'using cron 0 10,22 * * * UTC'
+
+//every month last day at 11pm
+schedule = 'using cron 0 23 L * * UTC'
+
+//every monday at 6:30am
+schedule = 'using cron 30 6 * * 1 UTC'
+
+//first day of month only from January to march
+schedule = 'using cron 0 7 1 1-3 * UTC'l;
+
+
+//creating DAG of tasks
+create table mydb.public.cust_admin
+(custid int autoincrement start = 1 increment = 1,
+cust_name string default 'John',
+dept_name string default 'sales',
+load_time timestamp
+);
+
+//Root task
+create or replace task mytasks.task_cust_admin warehouse = compute_wh schedule = '1 minute'
+as
+insert into mydb.public.cust_admin(load_time) values(current_timestamp);
+
+//Task for loading sales table
+create or replace task mytasks.task_cust_sales warehouse = compute_wh after mytasks.task_cust_admin
+as
+create or replace table mydb.public.cust_sales
+as
+select * from mydb.public.cust_admin where dept_name = 'sales';
+
+//Task for loading HR Table -- not mentioning warehouse, will use snowflake compute resources
+create or replace task mytasks.task_cust_hr after mytasks.task_cust_admin
+as
+create or replace table mydb.public.cust_hr
+as
+select * from mydb.public.cust_admin where dept_name = 'HR';
+
+//Task for loading Marketing Table -- not mentioning warehouse, will use snowflake compute resource
+create or replace task mytasks.task_cust_market
+as
+create or replace table mydb.public.cust_market
+as
+select * from mydb.public.cust_admin where dept_name = 'Market';
+
+//Add dependencies
+alter task mytasks.task_cust_market add after mytasks.task_cust_sales;
+alter task mytasks.task_cust_market add after mytasks.task_cust_hr;
+
+//start the tasks  - child first then parent
+alter task mytasks.task_cust_market resume;
+alter task mytasks.task_cust_sales resume;
+alter task mytasks.task_cust_hr resume;
+alter task mytasks.task_cust_admin resume;
+
+show tasks;
+
+//view the data
+select * from mydb.public.cust_admin;
+select * from mydb.public.cust_sales;
+select * from mydb.public.cust_hr;
+select * from mydb.public.cust_market;
+
+//alter the root task
+alter task mytasks.task_cust_admin modify
+as
+insert into mydb.public.cust_admin(cust_name,dept_name,load_time) values('Charles','Market',CURRENT_TIMESTAMP);
+
+
+//suspend the task before altering
+alter task task_cust_admin suspend;
+
+//Resume the task after altering
+alter task task_cust_admin resume;
+
+//view the data
+select * from mydb.public.cust_admin;
+select * from mydb.public.cust_sales;
+select * from mydb.public.cust_hr;
+select * from mydb.public.cust_market;
+
+
+--=============
+--Task History
+--=============
+// To see all tasks history with last executed task first
+select  *   from table(information_schema.task_history())
+  order by scheduled_time desc;  
+  
+// To see history of a specific task
+select  *  from table(information_schema.task_history(
+    task_name => 'TASK_TRACK_TIME')
+ );
+
+// To see results of a specific task in last 6 hours
+select  *  from table(information_schema.task_history(
+    scheduled_time_range_start => dateadd('hour',-6,current_timestamp()),
+    result_limit => 10,
+    task_name => 'TASK_TRACK_TIME')
+ ); 
+    
+// To see results in a given time period
+select  *  from table(information_schema.task_history(
+    scheduled_time_range_start => to_timestamp_ltz('2023-08-17 1:00:00.000 -0700'),
+    scheduled_time_range_end => to_timestamp_ltz('2022-07-22 1:00:00.000 -0700'))
+ ); 
+
+select to_timestamp_ltz(current_timestamp);
