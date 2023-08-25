@@ -1,0 +1,131 @@
+--Stored Procedures
+//create database and schemas if not exists
+create database if not exists mydb;
+create schema if not exists myprocs;
+
+--SQL Procedure
+//Setup some sample data
+create or replace table mydb.public.cust_sales
+(cid int,cname varchar,prodname varchar,prod_cat varchar,price number);
+
+desc table mydb.public.cust_sales;
+
+insert into mydb.public.cust_sales values
+(101,'RAMU', 'REFRIGERATOR', 'ELECTRONICS',25000),
+(101,'RAMU','TV','ELECTRONICS',33500),
+(101,'RAMU','MAGGIE','FOOD',200),
+(102,'LATHA','T-SHIRT','FASHION',1099),
+(102,'LATHA','JEANS','FASHION',2999),
+(102,'LATHA','WALLNUTS','FOOD',2000),
+(102,'LATHA','WASHING MACHINE','ELECTRONICS',29000),
+(102,'LATHA','SMART WATCH','ELECTRONICS',12000),
+(102,'LATHA','ALMOND','FOOD',1500),
+(102,'LATHA','TOUR DAL','FOOD',500),
+(102,'LATHA','RICE','FOOD',1300);
+
+
+select * from mydb.public.cust_sales;
+
+//create a procedure to calculate total amount spent in a store
+
+create or replace procedure myprocs.cust_tot_price(id int,cat varchar)
+returns float
+language sql
+as
+$$
+declare
+total_spent float;
+cur1 cursor for select cid,prod_cat,price from mydb.public.cust_sales;
+
+begin
+total_spent:=0;
+
+for rec in cur1
+do
+  if(rec.prod_cat = :cat and rec.CID = :id) then
+    total_spent := total_spent + rec.price;
+  end if;
+end for;
+
+return total_spent;
+end;
+
+$$
+;
+
+
+
+
+CREATE OR REPLACE PROCEDURE MYPROCS.CUST_TOT_PRICE(ID INT, CAT VARCHAR)
+RETURNS FLOAT
+LANGUAGE SQL
+AS
+$$
+declare
+total_spent float;
+cur1 cursor for select CID, PROD_CAT, PRICE from mydb.PUBLIC.CUST_SALES;
+
+begin
+total_spent := 0;
+
+for rec in cur1
+do
+    if (rec.PROD_CAT = :CAT and rec.CID = :ID) then 
+        total_spent := total_spent+rec.PRICE;
+    end if;
+end for;
+
+return total_spent;
+end;
+
+$$
+;
+
+
+
+
+
+//Calls to the stored procedure
+call MYPROCS.CUST_TOT_PRICE(101, 'ELECTRONICS');
+call myprocs.cust_tot_price(102,'FOOD');
+call myprocs.cust_tot_price(102,'ELECTRONICS');
+call myprocs.cust_tot_price(103,'FASHION');
+
+
+
+--Java Script Procedure
+
+/* How to Execute a sql query from java script
+var my_sql_command1 = "delete from history_table where event_year < 2016";
+var statement1 = snowflake.CreateStatement(sqlText:my_sql_command1);
+statement1.execute();
+*/
+
+
+//create a procedure to get the row count of a table
+create or replace procedure get_row_count(table_name varchar)
+  returns float not null
+  language javascript
+as
+$$
+ var row_count = 0;
+
+ var sql_command = "select count(*) from " + TABLE_NAME;
+
+ var stmt = snowflake.createStatement(
+     { sqlText: sql_command }
+   );
+
+ var res = stmt.execute();
+
+ res.next();
+
+ row_count = res.getColumnValue(1);
+
+ return row_count;
+
+$$
+;
+
+//Call the Procedure
+call GET_ROW_COUNT('mydb.public.cust_sales');
