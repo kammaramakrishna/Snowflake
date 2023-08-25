@@ -1,0 +1,222 @@
+--Streams
+use database mydb;
+
+select current_database();
+
+//cretae a schema for streams
+create or replace schema mystreams;
+
+//cretae a schema for source tables
+create or replace schema stage_tbls;
+
+//create a schema for target tables
+create or replace schema intg_tbls;
+
+//create sample table -- source table in stage schema
+create or replace table stage_tbls.stg_empl
+( empid int, empname varchar(30), salary float, age int,dept varchar(10), location varchar(20));
+
+//create a stream for above table
+CREATE or replace STREAM MYSTREAMS.STREAM_EMPL ON TABLE STAGE_TBLS.STG_EMPL;
+CREATE or replace STREAM MYSTREAMS.STREAM_EMPL_2 ON TABLE STAGE_TBLS.STG_EMPL;
+SHOW STREAMS IN SCHEMA MYSTREAMS;
+SELECT * FROM MYSTREAMS.STREAM_EMPL;
+
+//create a target table --final table in integration schema
+create or replace table intg_tbls.empl
+( empid int,empname varchar(30), salary float,age int, dept varchar(15),location varchar(20),insrt_dt date,lst_updt_dt date);
+
+//Inserts
+insert into stage_tbls.stg_empl values
+(1,'Amar', 80000,35,'SALES', 'Banglore'),
+(2,'Bharath',45000,26,'SALES', 'Hyderabad'),
+(3,'Charan',76000,34,'Technology','Chennai'),
+(4,'Divya',52000,28,'HR','Hyderabad'),
+(5,'Gopal',24500,22,'Technology','Bangalore'),
+(6,'Haritha',42000,27,'HR','Chennai');
+
+//check stage table data
+select * from stage_tbls.stg_empl;
+
+//observe the stream object
+select * from mystreams.stream_empl;
+
+//load the data into target table
+insert into intg_tbls.empl
+(empid,empname,salary,age,dept,location,insrt_dt,lst_updt_dt)
+select empid,empname,salary,age,dept,location,current_date,null from mystreams.stream_empl where metadata$action = 'INSERT' and metadata$isupdate = FALSE;
+
+//check target table data
+select * from intg_tbls.empl;
+
+//observe the stream object
+select * from mystreams.stream_empl;
+
+//Updates
+select * from stage_tbls.stg_empl;
+
+//update 2 records in stage table
+update stage_tbls.stg_empl set salary = 49000 where empid=2;
+update stage_tbls.stg_empl set location = 'Pune' where empid=5;
+
+//check stage table data
+select * from stage_tbls.stg_empl;
+
+//observe stream object now
+select * from mystreams.stream_empl;
+
+//consume stream object and merge into final table
+merge into intg_tbls.empl e using mystreams.stream_empl s on e.empid = s.empid
+when matched
+  and s.metadata$action = 'INSERT' 
+  and s.metadata$isupdate = 'TRUE'
+Then update
+  set e.empname = s.empname,
+e.salary = s.salary,
+e.age = s.age,
+e.dept = s.dept,
+e.location = s.location,
+e.lst_updt_dt = current_date;
+
+//observe the target table data
+select * from intg_tbls.empl;
+
+//check stream object
+select * from mystreams.stream_empl;
+
+//Deletes
+select * from stage_tbls.stg_empl;
+
+//delete 2 records from stage table
+delete from stage_tbls.stg_empl where empid in (3,4);
+
+//check stage table data
+select * from stage_tbls.stg_empl;
+
+//observe stream object now
+select * from mystreams.stream_empl;
+
+//consume stream object and merge into final table
+merge into intg_tbls.empl e
+using mystreams.stream_empl s
+on e.empid = s.empid
+when matched
+   and s.metadata$action = 'DELETE'
+   and s.metadata$isupdate = 'FALSE'
+then delete;
+
+//view final target table data
+select * from intg_tbls.empl;
+
+//observe stream object now
+select * from mystreams.stream_empl;
+
+//All changes at a time
+select * from stage_tbls.stg_empl;
+
+//insert 2 new records into table
+insert into stage_tbls.stg_empl values
+(7,'Janaki',61000,29,'Sales','Pune'),
+(8,'Kamal',92000,33,'Technology','Bangalore');
+
+//update existing record
+update stage_tbls.stg_empl
+set salary = 8500,location='Hyderabad' where empid = 1;
+
+//delete one existing record
+delete from stage_tbls.stg_empl where empid in (6);
+
+//check stage table data
+select * from stage_tbls.stg_empl;
+
+//Observe stream object now
+select * from mystreams.stream_empl;
+
+//consume all change from stream and merge into final table
+merge into intg_tbls.empl t
+using mystreams.stream_empl s
+on t.empid = s.empid
+when matched                                --delete
+  and s.metadata$action = 'DELETE'
+  and s.metadata$isupdate = 'FALSE'
+  then delete
+when matched                                --update
+  and s.metadata$action = 'INSERT'
+  and s.metadata$isupdate = 'TRUE'
+  then update
+  set t.empname = s.empname,
+t.salary = s.salary,
+t.age = s.age,
+t.dept = s.dept,
+t.location = s.location,
+t.lst_updt_dt = current_date
+when not matched                            --insert
+  and s.metadata$action = 'INSERT'
+ and s.metadata$isupdate = 'FALSE'
+  then insert(empid,empname,salary,age,dept,location,insrt_dt,lst_updt_dt) values(s.empid,s.empname,s.salary,s.age,s.dept,s.location,current_date,null);
+
+//view final target table data
+select * from intg_tbls.empl;
+
+//Observe stream object now
+select * from mystreams.stream_empl;
+
+
+
+//with tasks
+create or replace task mytasks.task_empl_data_load warehouse = compute_WH schedule = '5 minutes' 
+when system$stream_has_data('mystreams.stream_empl')
+as
+merge into intg_tbls.empl t
+using mystreams.stream_empl s
+on t.empid = s.empid
+when matched
+  and s.metadata$action = 'DELETE'
+  and s.metadata$isupdate = 'FALSE'
+  then delete
+when matched
+  and s.metadata$action = 'INSERT'
+  and s.metadata$isupdate = 'FALSE'
+  then delete
+when matched
+  and s.metadata$action = 'INSERT'
+  and s.metadata$isupdate = 'FALSE'
+  then delete
+when matched
+  and s.metadata$action = 'INSERT'
+  and s.metadata$isupdate = 'TRUE'
+  then update
+  set t.empname = s.empname,
+ t.salary = s.salary,
+ t.age = s.age,
+ t.dept = s.dept,
+ t.location = s.location,
+ t.lst_updt_dt = current_date
+when not matched
+  and s.metadata$action = 'INSERT'
+  and s.metadata$isupdate = 'FALSE'
+  then insert(empid,empname,salary,age,dept,location,insrt_dt,lst_updt) values(s.empid,s.empname,s.salary,s.age,s.dept,s.location,current_date,null);
+
+//start the task
+alter task mytasks.task_empl_data_load resume;
+select * from stage_tbls.stg_empl;
+
+//insert 1 new record
+insert into stage_tbls.stg_empl values
+(9,'Rama',47000,25,'HR','Chennai');
+
+//update existing record
+update stage_tbls.stg_empl
+set salary=67000 where empid=7;
+
+//delete one record
+delete from stage_tbls.stg_empl where empid in (8);
+
+//observe stream object now
+select * from mystreams.stream_empl;
+
+//observe target table data after 5mins
+select * from intg_tbls.empl;
+
+//observe stream object now
+select * from mystreams.stream_empl;
