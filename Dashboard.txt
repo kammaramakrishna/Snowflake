@@ -1,0 +1,38 @@
+--Line Chart:
+
+select SR_RETURNED_DATE_SK,SR_NET_LOSS from snowflake_sample_data.tpcds_sf100tcl.store_returns limit 100000;
+
+
+--Bar Chart:
+select * from snowflake_sample_data.tpcds_sf100tcl.customer limit 100;
+
+create database mydb;
+create schema r_schema;
+
+--Scatter:
+create table mydb.r_schema.heatgrid_practice(cname char,cid number);
+insert into mydb.r_schema.heatgrid_practice values('A',1);
+insert into mydb.r_schema.heatgrid_practice values('B',2);
+insert into mydb.r_schema.heatgrid_practice values('C',3);
+insert into mydb.r_schema.heatgrid_practice values('D',4);
+insert into mydb.r_schema.heatgrid_practice values('E',5);
+insert into mydb.r_schema.heatgrid_practice values('F',0);
+insert into mydb.r_schema.heatgrid_practice values('G',-1);
+insert into mydb.r_schema.heatgrid_practice values('H',-2);
+insert into mydb.r_schema.heatgrid_practice values('I',-3);
+insert into mydb.r_schema.heatgrid_practice values('J',-4);
+insert into mydb.r_schema.heatgrid_practice values('H',-5);
+
+
+select * from mydb.r_schema.heatgrid_practice limit 100;
+
+
+--Heatgrid:
+select * from snowflake_sample_data.tpcds_sf100tcl.web_sales limit 1000;
+
+--Scorecard:
+select * from table(information_schema.query_history()) where timediff(minute,start_time,end_time) > 1;
+
+
+--Table:
+select query_id,query_text,user_name,warehouse_name,timediff(minute,start_time,end_time) from table(information_schema.query_history()) order by start_time;
