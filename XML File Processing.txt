@@ -1,0 +1,122 @@
+// Create storage integration object
+create or replace storage integration s3_int
+  TYPE = EXTERNAL_STAGE
+  STORAGE_PROVIDER = S3
+  ENABLED = TRUE 
+  STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::846999304099:role/aws_s3_snowflake_int'
+  STORAGE_ALLOWED_LOCATIONS = ('s3://ramakrishnakamma/csv/')
+  COMMENT = 'Integration with aws s3 buckets' ;
+
+
+  // Create storage integration object
+create or replace storage integration s3_int
+  TYPE = EXTERNAL_STAGE
+  STORAGE_PROVIDER = S3
+  ENABLED = TRUE 
+  STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::846999304099:role/aws_s3_snowflake_int'
+  STORAGE_ALLOWED_LOCATIONS = ('s3://ramakrishnakamma/csv/')
+  COMMENT = 'Integration with aws s3 buckets' ;
+
+  show storage integrations;
+
+
+//Alter Storage Integration to add xml files location
+alter storage integration s3_int set storage_allowed_locations = ('s3://ramakrishnakamma/xml/','s3://ramakrishnakamma/csv','s3://ramakrishnakamma/json/');
+
+
+desc integration s3_int;
+
+//create required database and schemas
+create database if not exists mydb;
+create schema if not exists mydb.file_formats;
+create schema if not exists mydb.external_stages;
+create schema if not exists mydb.stage_tbls;
+create schema if not exists mydb.intg_tbls;
+
+
+//create file format object for xml files
+create or replace file format mydb.file_formats.xml_fileformat type = xml;
+
+//create stage on external s3 location
+create or replace stage mydb.external_stages.aws_s3_xml url = 's3://ramakrishnakamma/xml/' storage_integration = s3_int file_format = mydb.file_formats.xml_fileformat;
+
+desc stage mydb.external_stages.aws_s3_xml;
+
+//Listing files under your s3 xml bucket
+list @mydb.external_stages.aws_s3_xml;
+
+
+//View data from xml file
+select from @mydb.external_stages.aws_s3_xml/sample_xml.xml
+
+
+
+//Load xml file to variant table
+copy into mydb.stage_tbls.stg_books from @mydb.external_stages.aws_s3_xml files=('books_20230304.xml') force = TRUE;
+
+
+//Query Stage table
+select * from mydb.stage_tbls.stg_books;
+
+//create target table to load final data
+create or replace table intg_tbls.books
+(
+book_id varchar(20) not null,
+author varchar(50),
+title varchar(50),
+genre varchar(20),
+price number(10,2).
+publish_date date,
+description varchar(255),
+primary key(book_id)
+);
+
+
+//To get the root element name
+select xml_data:"@" from mydb.stage_tbls.stg_books;
+
+//To get root element value
+select xml_data:"$" from mydb.stage_tbls.stg_books;
+
+//Get the content using xmlget function,index position
+select xmlget(xml_data,'book',0):"$" from mydb.stage_tbls.stg_books;
+select xmlget(xml_data,'book',1):"$" from mydb.stage_tbls.stg_books;
+
+
+//Fetch actual data from file
+select 
+xmlget(bk.value,'id'):"$" as "book_id",
+xmlget(bk.value,'author'):"$" as "author"
+from mydb.stage_tbls.stg_books,
+lateral flatten(to_array(stg_books.xml_data:"$")) bk;
+
+
+//Fetch data and assign datatypes
+select
+xmlget(bk.value,'id'):"$"::varchar as "book_id",
+xmlget(bk.value,'author'):"$"::varchar as "author",
+xmlget(bk.value,'title'):"$"::varchar as "title",
+xmlget(bk.value,'genre'):"$"::varchar as "genre",
+xmlget(bk.value,'price'):"$"::number(10,2) as "price",
+xmlget(bk.value,'publich_date'):"$"::date as "publish_date",
+xmlget(bk.value,'description'):"$"::varchar as "description"
+
+from mydb.stage_tbls.stg_books,
+lateral flatten(to_array(stg_books.xml_data:"$")) bk;
+
+
+//Insert data from stage table to final target table
+insert into intg_tbls.books
+select
+xmlget(bk.value,'id'):"$"::varchar as "book_id",
+xmlget(bk.value,'author'):"$"::varchar as "author",
+xmlget(bk.value,'title'):"$"::varchar as "title",
+xmlget(bk.value,'genre'):"$"::varchar as "genre",
+xmlget(bk.value,'price'):"$"::number(10,2) as "Price",
+xmlget(bk.value,'publish_date'):"$"::date as "publish_date",
+xmlget(bk.value,'description'):"$"::varchar as "description"
+from mydb.stage_tbls.stg_books,
+lateral flatten(to_array(stg_books.xml_data:"$")) bk;
+
+//view final data
+select * from intg_tbls.books;
