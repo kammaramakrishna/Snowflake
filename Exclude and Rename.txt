@@ -1,0 +1,15 @@
+select * from snowflake_sample_data.tpcds_sf10tcl.call_center;
+
+--Exclude
+select * exclude cc_gmt_offset from snowflake_sample_data.tpcds_sf10tcl.call_center;
+
+select * exclude(cc_gmt_offset,cc_state) from snowflake_sample_data.tpcds_sf10tcl.call_center;
+
+
+--Rename
+select * rename(cc_state as State_Code, cc_zip as Zip_Code) from snowflake_sample_data.tpcds_sf10tcl.call_center;
+
+
+
+--Exclude and Rename
+select * exclude cc_gmt_offset rename(cc_state as state_code,cc_zip as Zip_code) from snowflake_sample_data.tpcds_sf10tcl.call_center;
